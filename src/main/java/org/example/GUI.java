@@ -5,10 +5,17 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.Socket;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,11 +56,14 @@ public class GUI extends JFrame implements ActionListener{
   final String FTIP = "192.168.1.1";
   private String IP;
   private String port;
+  InputStream input;
+  OutputStream output;
+  Socket socket;
   private String[] files = new String[5];
   int size = 0;
 
   SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/YY");
-  String str[] = {"Info1", "Info2", "Info3", "Info4", "Info5"};
+  //String str[] = {"Info1", "Info2", "Info3", "Info4", "Info5"};
 
   public GUI() {
     super("Example GUI");
@@ -101,15 +111,24 @@ public class GUI extends JFrame implements ActionListener{
   public void actionPerformed(ActionEvent e){
     if(e.getSource() == search){
       String fileName = tf.getText();
-      Random r = new Random();
-      for (int i = 0; i < 25; i++) {
-        listModel.insertElementAt(fileName + " " + str[r.nextInt(str.length)], i);
+      String[] found = requestFiles(fileName);
+      if (found != null) {
+        for (int i = 0; i < found.length; i++) {
+          listModel.insertElementAt(found[i], i);
+        }
+      } else {
+        listModel.insertElementAt("Not found", 0);
       }
+//      Random r = new Random();
+//      for (int i = 0; i < 25; i++) {
+//        listModel.insertElementAt(fileName + " " + str[r.nextInt(str.length)], i);
+//      }
       showed = true;
     }
     else if(e.getSource() == dload) {
       if(showed && !jl.isSelectionEmpty())
-        tf2.setText(jl.getSelectedValue().toString() + " donwloaded");
+//        tf2.setText(jl.getSelectedValue().toString() + " donwloaded");
+        downloadFiles(jl.getSelectedValue().toString());
     }
     else if(e.getSource() == upload && size < 5) {
       fc = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
@@ -137,35 +156,108 @@ public class GUI extends JFrame implements ActionListener{
     }
   }
   public String findPublicIp() {
-    String systemipaddress = "";
+    String globalip = "";
     try {
       URL url_name = new URL("http://bot.whatismyipaddress.com");
       BufferedReader sc =
           new BufferedReader(new InputStreamReader(url_name.openStream()));
-      systemipaddress = sc.readLine().trim();
+      globalip = sc.readLine().trim();
     }
     catch (Exception e) {
-      systemipaddress = "Cannot Execute Properly";
+      globalip = "Cannot Execute Properly";
     }
-    return systemipaddress;
+    return globalip;
   }
   public void getConnection() {
-    //send HELLO
-    //then files
+    try {
+      socket = new Socket(FTIP, FTport);
+      input = socket.getInputStream();
+      output = socket.getOutputStream();
+      output.write("HELLO".getBytes(StandardCharsets.UTF_8));
+      InputStreamReader reader = new InputStreamReader(input);
+      int ch;
+      StringBuilder data = new StringBuilder();
+      while ((ch = reader.read()) != -1) {
+        data.append((char) ch);
+      }
+      if (data.toString().equals("HI")) {
+        for (int i = 0; i < size; i++) {
+          output.write(files[i].getBytes(StandardCharsets.UTF_8));
+        }
+      }
+      reader.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
-  public void requestFiles() {
-    //requests files from FT, SEARCH: fname
-    //receives list of records
+  public String[] requestFiles(String name) {
+    String search = "SEARCH: " + name;
+    //List<String> found = new ArrayList<>();
+    String[] found = null;
+    try {
+      output.write(search.getBytes(StandardCharsets.UTF_8));
+      InputStreamReader reader = new InputStreamReader(input);
+      int ch;
+      StringBuilder data = new StringBuilder();
+      while ((ch = reader.read()) != -1) {
+        data.append((char) ch);
+      }
+      if (data.toString().startsWith("F")) {
+        found = data.toString().split(">");
+      }
+      reader.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return found;
   }
 
-  public void downloadFiles() {
+  public void downloadFiles(String file) {
+    String[] info = file.split(", ");
+    try {
+      Socket anotherPeer = new Socket(info[3], Integer.getInteger(info[4]));
+      InputStream pInput = anotherPeer.getInputStream();
+      OutputStream pOutput = anotherPeer.getOutputStream();
+      pOutput.write("DOWNLOAD: ".getBytes(StandardCharsets.UTF_8));
+      String fileInfo = info[0] + ", " + info[1] + ", " + info[2];
+      pOutput.write(fileInfo.getBytes(StandardCharsets.UTF_8));
+      InputStreamReader pReader = new InputStreamReader(pInput);
+      int ch;
+      StringBuilder data = new StringBuilder();
+      while ((ch = pReader.read()) != -1) {
+        data.append((char) ch);
+      }
+      if (data.toString().equals("FILE: ")) {
+        DataInputStream dis = new DataInputStream(input);
+        FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
+        int fsize = Integer.parseInt(info[2]);
+        int read = 0;
+        byte[] buf = new byte[4096];
+        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
+          fsize -= read;
+          fos.write(buf, 0, read);
+        }
+        fos.close();
+        dis.close();
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
     //connects to another peer with needed files
     //downloads files by sending DOWNLOAD, then FILE: fname, type, size
   }
 
   public void leave() {
-    //send BYE to FT
-    //leave the system
+    String bye = "BYE";
+    try {
+      output.write(bye.getBytes(StandardCharsets.UTF_8));
+      input.close();
+      output.close();
+      socket.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    //leave the system mb with a button
   }
 }
