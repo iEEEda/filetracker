@@ -34,7 +34,7 @@ public class MultiClientHandler implements Runnable {
             while (true) {
                 String request = in.readLine();
                 if (request != null) {
-                    System.out.println(request);
+                   // System.out.println(request);
                     if (!check) {
                         if (request.contains("HELLO")) {
                             //System.out.println("HELLO received");
@@ -69,6 +69,10 @@ public class MultiClientHandler implements Runnable {
                             //System.out.println(list.toString());
                             String value = "<"+list.subList(1,6).toString().substring(1,list.subList(1,6).toString().length()- 1)+">";
                             if(ht.containsKey(list.get(0))){
+                                if(ht.get(list.get(0)).contains(value)){
+                                    System.out.println("[SERVER][MultiClientHandler] duplicate file submission! ignoring it...");
+                                    continue;
+                                }
                                 ht.get(list.get(0)).add(value);
                                 bye1.add(list.get(0));
                                 bye2.add(value);
@@ -100,7 +104,7 @@ public class MultiClientHandler implements Runnable {
                     }
 
                     if (request.contains("SEARCH: ")) {
-                        System.out.println(ht.toString());
+                        //System.out.println(ht.toString());
                         String[] arr = request.split("SEARCH: ");
                         if(arr.length==1){
                             System.out
@@ -114,7 +118,7 @@ public class MultiClientHandler implements Runnable {
                             System.out.println("[SERVER] File that you are looking for is found...");
 
                             String temp = list.toString().substring(1,list.toString().length()-1);
-                            System.out.println("[SERVER]"+temp+" LIST SENT");
+                            //System.out.println("[SERVER]"+temp+" LIST SENT");
                             String sendIt = "FOUND: " + temp +"\n";
                             out.write(sendIt.getBytes(StandardCharsets.UTF_8));
 
