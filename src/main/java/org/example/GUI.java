@@ -14,6 +14,7 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.Buffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
@@ -57,6 +58,7 @@ public class GUI extends JFrame implements ActionListener{
   Socket socket;
   private String[] files = new String[5];
   int size = 0;
+  int elements = 0;
 
   SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/YY");
   //String str[] = {"Info1", "Info2", "Info3", "Info4", "Info5"};
@@ -109,8 +111,8 @@ public class GUI extends JFrame implements ActionListener{
     setVisible(true);
     IP = findPublicIp();
     port = 456;
-    if(getConnection()) {
-      startAccepting();
+    if (getConnection()) {
+      //startAccepting();
     }
   }
   public void actionPerformed(ActionEvent e){
@@ -118,9 +120,10 @@ public class GUI extends JFrame implements ActionListener{
       String fileName = tf.getText();
       String[] found = requestFiles(fileName);
       if (found != null) {
-        for (int i = 0; i < found.length; i++) {
-          listModel.insertElementAt(found[i], i);
+        for (int i = elements, j = 0; i < (elements + found.length) && j < found.length; i++, j++) {
+          listModel.insertElementAt("Received: " + found[j], i);
         }
+        elements += found.length;
       } else {
         listModel.insertElementAt("Not found", 0);
       }
@@ -134,27 +137,34 @@ public class GUI extends JFrame implements ActionListener{
       if(showed && !jl.isSelectionEmpty())
         downloadFiles(jl.getSelectedValue().toString());
     }
-    else if(e.getSource() == upload && size < 5) {
-      fc = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
-      int r = fc.showOpenDialog(null);
-      if (r == JFileChooser.APPROVE_OPTION) {
-        File f = fc.getSelectedFile();
-        String name = "";
-        String type = "";
-        int i = f.getName().lastIndexOf('.');
-        if (i > 0) {
-          name = f.getName().substring(0, i);
-          type = f.getName().substring(i + 1);
+    else if(e.getSource() == upload) {
+      if (size < 5) {
+        fc = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
+        int r = fc.showOpenDialog(null);
+        if (r == JFileChooser.APPROVE_OPTION) {
+          File f = fc.getSelectedFile();
+          String name = "";
+          String type = "";
+          int i = f.getName().lastIndexOf('.');
+          if (i > 0) {
+            name = f.getName().substring(0, i);
+            type = f.getName().substring(i + 1);
+          }
+          StringBuilder builder = new StringBuilder("<");
+          builder.append(name).append(", ");
+          builder.append(type).append(", ");
+          builder.append(f.length()).append(", ");
+          builder.append(sdf.format(f.lastModified())).append(", ");
+          builder.append(IP).append(", ").append(port).append(">");
+          files[size] = builder.toString();
+          size++;
+          sendFiles(size - 1);
+          listModel.insertElementAt("Sent: " + name, elements);
+          elements++;
+          System.out.println(files[size - 1]);
         }
-        StringBuilder builder = new StringBuilder("<");
-        builder.append(name).append(", ");
-        builder.append(type).append(", ");
-        builder.append(f.length()).append(", ");
-        builder.append(sdf.format(f.lastModified())).append(", ");
-        builder.append(IP).append(", ").append(port).append(">");
-        files[size] = builder.toString();
-        size++;
-        System.out.println(files[size - 1]);
+      } else {
+        tf2.setText("Maximum 5 files");
       }
     } else if (e.getSource() == exit) {
       leave();
@@ -180,23 +190,30 @@ public class GUI extends JFrame implements ActionListener{
       socket = new Socket(FTIP, FTport);
       input = socket.getInputStream();
       output = socket.getOutputStream();
-      output.write("HELLO".getBytes(StandardCharsets.UTF_8));
-      InputStreamReader reader = new InputStreamReader(input);
-      int ch;
-      StringBuilder data = new StringBuilder();
-      while ((ch = reader.read()) != -1) {
-        data.append((char) ch);
-      }
-      if (data.toString().startsWith("HI")) {
-        for (int i = 0; i < size; i++) {
-          output.write(files[i].getBytes(StandardCharsets.UTF_8));
-        }
+      output.write("HELLO\n".getBytes(StandardCharsets.UTF_8));
+      output.flush();
+      BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+      String data = reader.readLine();
+      if (data.contains("HI")) {
+        System.out.println(data);
+        System.out.println("HI received");
+        tf2.setText("Connected");
       }
       reader.close();
       return true;
     } catch (IOException e) {
       e.printStackTrace();
       return false;
+    }
+  }
+
+  public void sendFiles(int i) {
+    try {
+      output.write((files[i] + "\n").getBytes(StandardCharsets.UTF_8));
+      output.flush();
+      tf2.setText("File is sent");
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 
@@ -234,19 +251,15 @@ public class GUI extends JFrame implements ActionListener{
   }
 
   public String[] requestFiles(String name) {
-    String search = "SEARCH: " + name;
+    String search = "SEARCH: " + name + "\n";
     //List<String> found = new ArrayList<>();
     String[] found = null;
     try {
       output.write(search.getBytes(StandardCharsets.UTF_8));
-      InputStreamReader reader = new InputStreamReader(input);
-      int ch;
-      StringBuilder data = new StringBuilder();
-      while ((ch = reader.read()) != -1) {
-        data.append((char) ch);
-      }
-      if (data.toString().startsWith("F")) {
-        found = data.toString().split(">");
+      BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+      String data = reader.readLine();
+      if (data.startsWith("F")) {
+        found = data.split(">");
       }
       reader.close();
     } catch (IOException e) {
@@ -262,7 +275,7 @@ public class GUI extends JFrame implements ActionListener{
       InputStream pInput = anotherPeer.getInputStream();
       OutputStream pOutput = anotherPeer.getOutputStream();
       pOutput.write("DOWNLOAD: ".getBytes(StandardCharsets.UTF_8));
-      String fileInfo = info[0] + ", " + info[1] + ", " + info[2];
+      String fileInfo = info[0] + ", " + info[1] + ", " + info[2] + "\n";
       pOutput.write(fileInfo.getBytes(StandardCharsets.UTF_8));
       InputStreamReader pReader = new InputStreamReader(pInput);
       int ch;
@@ -291,7 +304,7 @@ public class GUI extends JFrame implements ActionListener{
   }
 
   public void leave() {
-    String bye = "BYE";
+    String bye = "BYE\n";
     try {
       output.write(bye.getBytes(StandardCharsets.UTF_8));
       input.close();
