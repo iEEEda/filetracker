@@ -59,9 +59,10 @@ public class MultiClientHandler implements Runnable {
                             String[] arr = request.replaceAll("[^a-zA-Z0-9./ ]", "").split(" ");
                             if (arr.length % 6 != 0) {
                                 System.out.println(
-                                        "[SERVER][MultiClientHandler] file submission is not proper!");
+                                        "[SERVER][MultiClientHandler] submission was incorrect... TRY AGAIN!");
+
                                 client.close();
-                                break;
+                                continue;
                             }
                             System.out.println(
                                     "[SERVER][MultiClientHandler] proper file submission! adding them...");
@@ -88,6 +89,13 @@ public class MultiClientHandler implements Runnable {
                            // System.out.println("THE HASHTABLE: " + ht.toString());
 
                             continue;
+                        } else if (fileCheck==0 && !request.contains("<")){
+                            System.out.println(
+                                    "[SERVER][MultiClientHandler] No uploaded files...");
+                            client.close();
+                            System.out
+                                    .println("[SERVER][MultiClientHandler] Connection dismissed...");
+                            break;
                         }
 
                     }
