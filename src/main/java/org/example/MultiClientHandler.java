@@ -85,7 +85,7 @@ public class MultiClientHandler implements Runnable {
 
 
                             //System.out.println("THE VALUE list: " + list.subList(1,6).toString());
-                            System.out.println("THE HASHTABLE: " + ht.toString());
+                           // System.out.println("THE HASHTABLE: " + ht.toString());
 
                             continue;
                         }
@@ -106,11 +106,12 @@ public class MultiClientHandler implements Runnable {
                     if (request.contains("SEARCH: ")) {
                         //System.out.println(ht.toString());
                         String[] arr = request.split("SEARCH: ");
-                        if(arr.length==1){
+                        if(arr.length==0){
                             System.out
                                     .println("[SERVER] File that you are looking for is not found...");
                             out.write("NOT FOUND\n".getBytes(StandardCharsets.UTF_8));
                             out.flush();
+                            continue;
                         }
                         if (ht.containsKey(arr[1])) {
                             List<String> list = ht.get(arr[1]);
