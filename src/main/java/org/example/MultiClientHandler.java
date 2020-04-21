@@ -12,16 +12,16 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class MultiClientHandler implements Runnable {
-private Socket client;
-private BufferedReader in;
-private OutputStream out;
-private boolean check = false;
-private boolean fileCheck = false;
-private Hashtable<String, List<String>> ht;
+    private Socket client;
+    private BufferedReader in;
+    private OutputStream out;
+    private boolean check = false;
+    private boolean fileCheck = false;
+    private Hashtable<String, List<String>> ht;
     public MultiClientHandler(Socket client, Hashtable<String, List<String>> ht) throws IOException {
         this.client = client;
         this.ht = ht;
-        in = new BufferedReader(new InputStreamReader(client.getInputStream()));
+
         out = client.getOutputStream();
     }
 
@@ -29,6 +29,7 @@ private Hashtable<String, List<String>> ht;
     public void run() {
         try{
             while(true){
+                in = new BufferedReader(new InputStreamReader(client.getInputStream()));
                 String request = in.readLine();
                 if (!check){
                     if(request.contains("HELLO")){
@@ -44,9 +45,9 @@ private Hashtable<String, List<String>> ht;
                 }else if(!fileCheck){
                     if(request.contains("<")){
 //                        <file name, file type, file size, file last modified date (DD/MM/YY), IP address, port number>
-//                        <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999>
+//                        <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999> <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999> <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999> <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999>
 //                        yernur txt 45kb 11/22/22 123.123.123.1 9999
-                        String[] arr= request.replaceAll("[^a-zA-Z0-9./ ]","").split(" ");
+                        String[] arr= request.replaceAll("[^a-zA-Z0-9./<> ]","").split(" ");
                         if(arr.length%6!=0){
                             System.out.println("[SERVER][MultiClientHandler] file submission is not proper!");
                             client.close();
