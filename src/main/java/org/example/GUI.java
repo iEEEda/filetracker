@@ -14,7 +14,6 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
-import java.nio.Buffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
@@ -56,6 +55,7 @@ public class GUI extends JFrame implements ActionListener{
   InputStream input;
   OutputStream output;
   Socket socket;
+  BufferedReader reader;
   private String[] files = new String[5];
   int size = 0;
   int elements = 0;
@@ -125,7 +125,7 @@ public class GUI extends JFrame implements ActionListener{
         }
         elements += found.length;
       } else {
-        listModel.insertElementAt("Not found", 0);
+        tf2.setText("Not found");
       }
 //      Random r = new Random();
 //      for (int i = 0; i < 25; i++) {
@@ -192,14 +192,13 @@ public class GUI extends JFrame implements ActionListener{
       output = socket.getOutputStream();
       output.write("HELLO\n".getBytes(StandardCharsets.UTF_8));
       output.flush();
-      BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+      reader = new BufferedReader(new InputStreamReader(input));
       String data = reader.readLine();
       if (data.contains("HI")) {
         System.out.println(data);
         System.out.println("HI received");
         tf2.setText("Connected");
       }
-      reader.close();
       return true;
     } catch (IOException e) {
       e.printStackTrace();
@@ -218,6 +217,7 @@ public class GUI extends JFrame implements ActionListener{
   }
 
   public void startAccepting() {
+    // TODO: another thread and close it in the end
     try {
       ServerSocket server = new ServerSocket(port);
       while (true) {
@@ -226,8 +226,8 @@ public class GUI extends JFrame implements ActionListener{
         System.out.println("[SERVER] Connected to client!");
         InputStream in = client.getInputStream();
         OutputStream out = client.getOutputStream();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-        String line = reader.readLine();
+        BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
+        String line = reader2.readLine();
         if (line.startsWith("DOWNLOAD: ")) {
           System.out.println("Client wants to download a file");
           String[] fileInfo = line.substring(10).split(", ");
@@ -241,6 +241,7 @@ public class GUI extends JFrame implements ActionListener{
             System.out.println("Done.");
           }
         }
+        reader2.close();
         out.close();
         in.close();
         client.close();
@@ -256,12 +257,11 @@ public class GUI extends JFrame implements ActionListener{
     String[] found = null;
     try {
       output.write(search.getBytes(StandardCharsets.UTF_8));
-      BufferedReader reader = new BufferedReader(new InputStreamReader(input));
       String data = reader.readLine();
       if (data.startsWith("F")) {
+        //TODO: split multiple files and make found more readable
         found = data.split(">");
       }
-      reader.close();
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -293,6 +293,7 @@ public class GUI extends JFrame implements ActionListener{
           fsize -= read;
           fos.write(buf, 0, read);
         }
+        pReader.close();
         fos.close();
         dis.close();
       }
@@ -307,9 +308,13 @@ public class GUI extends JFrame implements ActionListener{
     String bye = "BYE\n";
     try {
       output.write(bye.getBytes(StandardCharsets.UTF_8));
+      reader.close();
       input.close();
       output.close();
       socket.close();
+      tf.setText("");
+      tf2.setText("");
+      listModel.clear();
     } catch (IOException e) {
       e.printStackTrace();
     }
