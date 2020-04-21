@@ -1,4 +1,6 @@
 package org.example;
+import com.sun.security.ntlm.Server;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -7,7 +9,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class FT {
-  private static final String IP = "192.168.1.1";
+  private static final String IP = "127.0.0.1";
   private static final int PORT = 9999;
 
   private static ExecutorService threads = Executors.newFixedThreadPool(4);
@@ -27,7 +29,7 @@ public class FT {
         clients.add(visitor);
         threads.execute(visitor);
       }
-    }catch (Exception ex){
+    } catch (Exception ex) {
       System.err.println("[SERVER] IOException in server loop!");
       ex.printStackTrace();
     }

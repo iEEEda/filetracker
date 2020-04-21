@@ -3,7 +3,6 @@ package org.example;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.File;
@@ -12,14 +11,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -27,10 +24,8 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.filechooser.FileSystemView;
-import javax.swing.plaf.FileChooserUI;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -46,16 +41,17 @@ public class GUI extends JFrame implements ActionListener{
   private JButton search;
   private JButton dload;
   private JButton upload;
+  private JButton exit;
   private JList jl;
   private JLabel label;
   private JTextField tf,tf2;
   DefaultListModel listModel;
   private JFileChooser fc;
   private boolean showed = false;
-  final int FTport = 111;
-  final String FTIP = "192.168.1.1";
+  final int FTport = 9999;
+  final String FTIP = "127.0.0.1";
   private String IP;
-  private String port;
+  private int port;
   InputStream input;
   OutputStream output;
   Socket socket;
@@ -88,6 +84,11 @@ public class GUI extends JFrame implements ActionListener{
     upload.addActionListener(this);
     add(upload);
 
+    exit = new JButton("Disconnect");
+    exit.setBounds(350, 480, 120, 20);
+    exit.addActionListener(this);
+    add(exit);
+
     listModel = new DefaultListModel();
     jl = new JList(listModel);
 
@@ -107,6 +108,10 @@ public class GUI extends JFrame implements ActionListener{
 
     setVisible(true);
     IP = findPublicIp();
+    port = 456;
+    if(getConnection()) {
+      startAccepting();
+    }
   }
   public void actionPerformed(ActionEvent e){
     if(e.getSource() == search){
@@ -127,7 +132,6 @@ public class GUI extends JFrame implements ActionListener{
     }
     else if(e.getSource() == dload) {
       if(showed && !jl.isSelectionEmpty())
-//        tf2.setText(jl.getSelectedValue().toString() + " donwloaded");
         downloadFiles(jl.getSelectedValue().toString());
     }
     else if(e.getSource() == upload && size < 5) {
@@ -135,7 +139,6 @@ public class GUI extends JFrame implements ActionListener{
       int r = fc.showOpenDialog(null);
       if (r == JFileChooser.APPROVE_OPTION) {
         File f = fc.getSelectedFile();
-//        String[] type = f.getName().split("\\.(?=[^\\.]+$)");
         String name = "";
         String type = "";
         int i = f.getName().lastIndexOf('.');
@@ -153,10 +156,13 @@ public class GUI extends JFrame implements ActionListener{
         size++;
         System.out.println(files[size - 1]);
       }
+    } else if (e.getSource() == exit) {
+      leave();
     }
   }
+
   public String findPublicIp() {
-    String globalip = "";
+    String globalip = null;
     try {
       URL url_name = new URL("http://bot.whatismyipaddress.com");
       BufferedReader sc =
@@ -164,11 +170,12 @@ public class GUI extends JFrame implements ActionListener{
       globalip = sc.readLine().trim();
     }
     catch (Exception e) {
-      globalip = "Cannot Execute Properly";
+      e.printStackTrace();
     }
     return globalip;
   }
-  public void getConnection() {
+
+  public boolean getConnection() {
     try {
       socket = new Socket(FTIP, FTport);
       input = socket.getInputStream();
@@ -180,12 +187,47 @@ public class GUI extends JFrame implements ActionListener{
       while ((ch = reader.read()) != -1) {
         data.append((char) ch);
       }
-      if (data.toString().equals("HI")) {
+      if (data.toString().startsWith("HI")) {
         for (int i = 0; i < size; i++) {
           output.write(files[i].getBytes(StandardCharsets.UTF_8));
         }
       }
       reader.close();
+      return true;
+    } catch (IOException e) {
+      e.printStackTrace();
+      return false;
+    }
+  }
+
+  public void startAccepting() {
+    try {
+      ServerSocket server = new ServerSocket(port);
+      while (true) {
+        System.out.println("[SERVER] waiting for clients...");
+        Socket client = server.accept();
+        System.out.println("[SERVER] Connected to client!");
+        InputStream in = client.getInputStream();
+        OutputStream out = client.getOutputStream();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String line = reader.readLine();
+        if (line.startsWith("DOWNLOAD: ")) {
+          System.out.println("Client wants to download a file");
+          String[] fileInfo = line.substring(10).split(", ");
+          byte[] filebytes;
+          File file = new File(fileInfo[0]);
+          if (file.exists()) {
+            System.out.println("File exists");
+            filebytes = Files.readAllBytes(file.toPath());
+            out.write(filebytes, 0, filebytes.length);
+            out.flush();
+            System.out.println("Done.");
+          }
+        }
+        out.close();
+        in.close();
+        client.close();
+      }
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -228,7 +270,7 @@ public class GUI extends JFrame implements ActionListener{
       while ((ch = pReader.read()) != -1) {
         data.append((char) ch);
       }
-      if (data.toString().equals("FILE: ")) {
+      if (data.toString().startsWith("FILE: ")) {
         DataInputStream dis = new DataInputStream(input);
         FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
         int fsize = Integer.parseInt(info[2]);
@@ -258,6 +300,5 @@ public class GUI extends JFrame implements ActionListener{
     } catch (IOException e) {
       e.printStackTrace();
     }
-    //leave the system mb with a button
   }
 }
