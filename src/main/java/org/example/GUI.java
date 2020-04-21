@@ -17,6 +17,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -56,6 +57,7 @@ public class GUI extends JFrame implements ActionListener{
   OutputStream output;
   Socket socket;
   BufferedReader reader;
+  private AtomicBoolean disconect = new AtomicBoolean(false);
   private String[] files = new String[5];
   int size = 0;
   int elements = 0;
@@ -69,11 +71,11 @@ public class GUI extends JFrame implements ActionListener{
     setSize(500,600);
 
     label = new JLabel("File name:");
-    label.setBounds(50,50, 80,20);
+    label.setBounds(40,50, 80,20);
     add(label);
 
     tf = new JTextField();
-    tf.setBounds(130,50, 215,20);
+    tf.setBounds(120,50, 225,20);
     add(tf);
 
     search = new JButton("Search");
@@ -95,7 +97,7 @@ public class GUI extends JFrame implements ActionListener{
     jl = new JList(listModel);
 
     JScrollPane listScroller = new JScrollPane(jl);
-    listScroller.setBounds(50, 80,300,300);
+    listScroller.setBounds(40, 80,310,300);
 
     add(listScroller);
 
@@ -112,26 +114,25 @@ public class GUI extends JFrame implements ActionListener{
     IP = findPublicIp();
     port = 456;
     if (getConnection()) {
-      //startAccepting();
+      startAccepting();
     }
   }
   public void actionPerformed(ActionEvent e){
     if(e.getSource() == search){
-      String fileName = tf.getText();
-      String[] found = requestFiles(fileName);
-      if (found != null) {
-        for (int i = elements, j = 0; i < (elements + found.length) && j < found.length; i++, j++) {
-          listModel.insertElementAt("Received: " + found[j], i);
+      if (!disconect.get()) {
+        String fileName = tf.getText();
+        String[] found = requestFiles(fileName);
+        if (found != null) {
+          for (int i = elements, j = 0; i < (elements + found.length) && j < found.length;
+               i++, j++) {
+            listModel.insertElementAt("Received: " + found[j], i);
+          }
+          elements += found.length;
+        } else {
+          tf2.setText("Not found");
         }
-        elements += found.length;
-      } else {
-        tf2.setText("Not found");
+        showed = true;
       }
-//      Random r = new Random();
-//      for (int i = 0; i < 25; i++) {
-//        listModel.insertElementAt(fileName + " " + str[r.nextInt(str.length)], i);
-//      }
-      showed = true;
     }
     else if(e.getSource() == dload) {
       if(showed && !jl.isSelectionEmpty())
@@ -167,7 +168,15 @@ public class GUI extends JFrame implements ActionListener{
         tf2.setText("Maximum 5 files");
       }
     } else if (e.getSource() == exit) {
-      leave();
+      if (!disconect.get()) {
+        leave();
+        exit.setText("Connect");
+      } else {
+        disconect.set(false);
+        getConnection();
+        exit.setText("Disconnect");
+        tf2.setText("Connected");
+      }
     }
   }
 
@@ -217,38 +226,39 @@ public class GUI extends JFrame implements ActionListener{
   }
 
   public void startAccepting() {
-    // TODO: another thread and close it in the end
-    try {
-      ServerSocket server = new ServerSocket(port);
-      while (true) {
-        System.out.println("[SERVER] waiting for clients...");
-        Socket client = server.accept();
-        System.out.println("[SERVER] Connected to client!");
-        InputStream in = client.getInputStream();
-        OutputStream out = client.getOutputStream();
-        BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
-        String line = reader2.readLine();
-        if (line.startsWith("DOWNLOAD: ")) {
-          System.out.println("Client wants to download a file");
-          String[] fileInfo = line.substring(10).split(", ");
-          byte[] filebytes;
-          File file = new File(fileInfo[0]);
-          if (file.exists()) {
-            System.out.println("File exists");
-            filebytes = Files.readAllBytes(file.toPath());
-            out.write(filebytes, 0, filebytes.length);
-            out.flush();
-            System.out.println("Done.");
+    new Thread(() -> {
+      try {
+        ServerSocket server = new ServerSocket(port);
+        while (!disconect.get()) {
+          System.out.println("[SERVER] waiting for clients...");
+          Socket client = server.accept();
+          System.out.println("[SERVER] Connected to client!");
+          InputStream in = client.getInputStream();
+          OutputStream out = client.getOutputStream();
+          BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
+          String line = reader2.readLine();
+          if (line.startsWith("DOWNLOAD: ")) {
+            System.out.println("Client wants to download a file");
+            String[] fileInfo = line.substring(10).split(", ");
+            byte[] filebytes;
+            File file = new File(fileInfo[0] + "." + fileInfo[1]);
+            if (file.exists()) {
+              System.out.println("File exists");
+              filebytes = Files.readAllBytes(file.toPath());
+              out.write(filebytes, 0, filebytes.length);
+              out.flush();
+              System.out.println("Done.");
+            }
           }
+          client.close();
+          reader2.close();
+          out.close();
+          in.close();
         }
-        reader2.close();
-        out.close();
-        in.close();
-        client.close();
+      } catch (IOException e) {
+        e.printStackTrace();
       }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    });
   }
 
   public String[] requestFiles(String name) {
@@ -258,48 +268,54 @@ public class GUI extends JFrame implements ActionListener{
     try {
       output.write(search.getBytes(StandardCharsets.UTF_8));
       String data = reader.readLine();
-      if (data.startsWith("F")) {
-        //TODO: split multiple files and make found more readable
-        found = data.split(">");
+      if (data != null) {
+        if (data.startsWith("F")) {
+          found = data.substring(7).replaceAll("<", name + ", ").split(">");
+          for (int i = 1; i < found.length; i++) {
+            found[i] = found[i].substring(2);
+          }
+        }
       }
     } catch (IOException e) {
       e.printStackTrace();
     }
+    tf.setText("");
     return found;
   }
 
   public void downloadFiles(String file) {
-    String[] info = file.split(", ");
-    try {
-      Socket anotherPeer = new Socket(info[3], Integer.getInteger(info[4]));
-      InputStream pInput = anotherPeer.getInputStream();
-      OutputStream pOutput = anotherPeer.getOutputStream();
-      pOutput.write("DOWNLOAD: ".getBytes(StandardCharsets.UTF_8));
+    String[] info = file.substring(10).split(", ");
+//    try {
       String fileInfo = info[0] + ", " + info[1] + ", " + info[2] + "\n";
-      pOutput.write(fileInfo.getBytes(StandardCharsets.UTF_8));
-      InputStreamReader pReader = new InputStreamReader(pInput);
-      int ch;
-      StringBuilder data = new StringBuilder();
-      while ((ch = pReader.read()) != -1) {
-        data.append((char) ch);
-      }
-      if (data.toString().startsWith("FILE: ")) {
-        DataInputStream dis = new DataInputStream(input);
-        FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
-        int fsize = Integer.parseInt(info[2]);
-        int read = 0;
-        byte[] buf = new byte[4096];
-        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
-          fsize -= read;
-          fos.write(buf, 0, read);
-        }
-        pReader.close();
-        fos.close();
-        dis.close();
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    System.out.println(fileInfo);
+//      Socket anotherPeer = new Socket(info[3], Integer.getInteger(info[4]));
+//      InputStream pInput = anotherPeer.getInputStream();
+//      OutputStream pOutput = anotherPeer.getOutputStream();
+//      pOutput.write("DOWNLOAD: ".getBytes(StandardCharsets.UTF_8));
+//      pOutput.write(fileInfo.getBytes(StandardCharsets.UTF_8));
+//      InputStreamReader pReader = new InputStreamReader(pInput);
+//      int ch;
+//      StringBuilder data = new StringBuilder();
+//      while ((ch = pReader.read()) != -1) {
+//        data.append((char) ch);
+//      }
+//      if (data.toString().startsWith("FILE: ")) {
+//        DataInputStream dis = new DataInputStream(input);
+//        FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
+//        int fsize = Integer.parseInt(info[2]);
+//        int read = 0;
+//        byte[] buf = new byte[4096];
+//        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
+//          fsize -= read;
+//          fos.write(buf, 0, read);
+//        }
+//        pReader.close();
+//        fos.close();
+//        dis.close();
+//      }
+//    } catch (IOException e) {
+//      e.printStackTrace();
+//    }
     //connects to another peer with needed files
     //downloads files by sending DOWNLOAD, then FILE: fname, type, size
   }
@@ -313,8 +329,10 @@ public class GUI extends JFrame implements ActionListener{
       output.close();
       socket.close();
       tf.setText("");
-      tf2.setText("");
-      listModel.clear();
+      tf2.setText("Disconnected");
+      listModel.removeAllElements();
+      elements = 0;
+      disconect.set(true);
     } catch (IOException e) {
       e.printStackTrace();
     }
