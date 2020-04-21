@@ -16,10 +16,10 @@ public class MultiClientHandler implements Runnable {
     private BufferedReader in;
     private OutputStream out;
     private boolean check = false;
-    private boolean fileCheck = false;
+    private int fileCheck = 0;
     private Hashtable<String, List<String>> ht;
     private List<String> bye1 = new LinkedList<>();
-    private List<List<String>> bye2 = new LinkedList<>();
+    private List<String> bye2 = new LinkedList<>();
 
     public MultiClientHandler(Socket client, Hashtable<String, List<String>> ht) throws IOException {
         this.client = client;
@@ -37,7 +37,7 @@ public class MultiClientHandler implements Runnable {
                     System.out.println(request);
                     if (!check) {
                         if (request.contains("HELLO")) {
-                            System.out.println("HELLO received");
+                            //System.out.println("HELLO received");
                             out.write("HI\n".getBytes(StandardCharsets.UTF_8));
                             out.flush();
                             check = true;
@@ -49,9 +49,10 @@ public class MultiClientHandler implements Runnable {
                             client.close();
                             break;
                         }
-                    } else if (!fileCheck) {
-                        if (request.contains("<")) {
-                            System.out.println("File is received");
+                    } else if (fileCheck!=5) {
+                        if (request.startsWith("<")) {
+                            fileCheck++;
+                            //System.out.println("File is received");
 //                        <file name, file type, file size, file last modified date (DD/MM/YY), IP address, port number>
 //                        <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999>
 //                        yernur txt 45kb 11/22/22 123.123.123.1 9999
@@ -65,28 +66,41 @@ public class MultiClientHandler implements Runnable {
                             System.out.println(
                                     "[SERVER][MultiClientHandler] proper file submission! adding them...");
                             LinkedList<String> list = new LinkedList<>(Arrays.asList(arr));
-                            System.out.println(list.toString());
-                            for (int i = 0; i < list.size(); i += 7) {
-                                ht.put(list.get(i), list.subList(i + 1, i + 6));
-                                bye1.add(list.get(i));
-                                bye2.add(list.subList(i, i + 5));
+                            //System.out.println(list.toString());
+                            String value = "<"+list.subList(1,6).toString().substring(1,list.subList(1,6).toString().length()- 1)+">";
+                            if(ht.containsKey(list.get(0))){
+                                ht.get(list.get(0)).add(value);
+                                bye1.add(list.get(0));
+                                bye2.add(value);
+
+                            }else{
+                                List<String> linkedList = new LinkedList<>();
+                                linkedList.add(value);
+                                ht.put(list.get(0), linkedList);
                             }
+
+
+                            //System.out.println("THE VALUE list: " + list.subList(1,6).toString());
                             System.out.println("THE HASHTABLE: " + ht.toString());
-                            fileCheck = true;
+
                             continue;
                         }
 
-                    } else if (request.contains("BYE")) {
+                    }
+                    if (request.contains("BYE")) {
                         out.write("BYE BYE\n".getBytes(StandardCharsets.UTF_8));
                         out.flush();
                         int j = bye1.size();
                         for (int i = 0; i < j; i++) {
-                            ht.remove(bye1.get(i), bye2.get(i));
+                            ht.get(bye1.get(i)).remove(bye2.get(i));
                         }
                         System.out.println("[SERVER][MultiClientHandler] Connection finished...");
                         client.close();
                         break;
-                    } else if (request.contains("SEARCH: ")) {
+                    }
+
+                    if (request.contains("SEARCH: ")) {
+                        System.out.println(ht.toString());
                         String[] arr = request.split("SEARCH: ");
                         if(arr.length==1){
                             System.out
@@ -96,8 +110,10 @@ public class MultiClientHandler implements Runnable {
                         }
                         if (ht.containsKey(arr[1])) {
                             List<String> list = ht.get(arr[1]);
+
                             System.out.println("[SERVER] File that you are looking for is found...");
-                            String temp = "<"+list.toString().substring(1,list.toString().length()-1)+">";
+
+                            String temp = list.toString().substring(1,list.toString().length()-1);
                             System.out.println("[SERVER]"+temp+" LIST SENT");
                             String sendIt = "FOUND: " + temp +"\n";
                             out.write(sendIt.getBytes(StandardCharsets.UTF_8));
