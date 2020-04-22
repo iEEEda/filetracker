@@ -174,6 +174,7 @@ public class GUI extends JFrame implements ActionListener{
       } else {
         disconect.set(false);
         getConnection();
+        startAccepting();
         exit.setText("Disconnect");
         tf2.setText("Connected");
       }
@@ -226,19 +227,23 @@ public class GUI extends JFrame implements ActionListener{
   }
 
   public void startAccepting() {
-    new Thread(() -> {
+//    System.out.println("Creating a thread");
+//    new Thread(() -> {
+//      System.out.println("Thread created");
       try {
         ServerSocket server = new ServerSocket(port);
+        System.out.println("Start listening");
         while (!disconect.get()) {
-          System.out.println("[SERVER] waiting for clients...");
+          System.out.println("waiting for clients...");
           Socket client = server.accept();
-          System.out.println("[SERVER] Connected to client!");
+          System.out.println("Connected to client!");
           InputStream in = client.getInputStream();
           OutputStream out = client.getOutputStream();
           BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
           String line = reader2.readLine();
           if (line.startsWith("DOWNLOAD: ")) {
             System.out.println("Client wants to download a file");
+            out.write("FILE: \n".getBytes(StandardCharsets.UTF_8));
             String[] fileInfo = line.substring(10).split(", ");
             byte[] filebytes;
             File file = new File(fileInfo[0] + "." + fileInfo[1]);
@@ -258,7 +263,7 @@ public class GUI extends JFrame implements ActionListener{
       } catch (IOException e) {
         e.printStackTrace();
       }
-    });
+    //});
   }
 
   public String[] requestFiles(String name) {
@@ -285,39 +290,34 @@ public class GUI extends JFrame implements ActionListener{
 
   public void downloadFiles(String file) {
     String[] info = file.substring(10).split(", ");
-//    try {
+    try {
       String fileInfo = info[0] + ", " + info[1] + ", " + info[2] + "\n";
-    System.out.println(fileInfo);
-//      Socket anotherPeer = new Socket(info[3], Integer.getInteger(info[4]));
-//      InputStream pInput = anotherPeer.getInputStream();
-//      OutputStream pOutput = anotherPeer.getOutputStream();
-//      pOutput.write("DOWNLOAD: ".getBytes(StandardCharsets.UTF_8));
-//      pOutput.write(fileInfo.getBytes(StandardCharsets.UTF_8));
-//      InputStreamReader pReader = new InputStreamReader(pInput);
-//      int ch;
-//      StringBuilder data = new StringBuilder();
-//      while ((ch = pReader.read()) != -1) {
-//        data.append((char) ch);
-//      }
-//      if (data.toString().startsWith("FILE: ")) {
-//        DataInputStream dis = new DataInputStream(input);
-//        FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
-//        int fsize = Integer.parseInt(info[2]);
-//        int read = 0;
-//        byte[] buf = new byte[4096];
-//        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
-//          fsize -= read;
-//          fos.write(buf, 0, read);
-//        }
-//        pReader.close();
-//        fos.close();
-//        dis.close();
-//      }
-//    } catch (IOException e) {
-//      e.printStackTrace();
-//    }
-    //connects to another peer with needed files
-    //downloads files by sending DOWNLOAD, then FILE: fname, type, size
+//    System.out.println(fileInfo);
+      for (int i = 0; i < info.length; i++) {
+        System.out.println();
+      }
+      Socket anotherPeer = new Socket(info[4], Integer.parseInt(info[5]));
+      InputStream pInput = anotherPeer.getInputStream();
+      OutputStream pOutput = anotherPeer.getOutputStream();
+      pOutput.write(("DOWNLOAD: " + fileInfo).getBytes(StandardCharsets.UTF_8));
+      String data = reader.readLine();
+      if (data.startsWith("FILE: ")) {
+        DataInputStream dis = new DataInputStream(input);
+        FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
+        int fsize = Integer.parseInt(info[2]);
+        int read = 0;
+        byte[] buf = new byte[4096];
+        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
+          fsize -= read;
+          fos.write(buf, 0, read);
+        }
+        fos.close();
+        dis.close();
+        anotherPeer.close();
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
   public void leave() {
