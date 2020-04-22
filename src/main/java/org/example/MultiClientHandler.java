@@ -126,8 +126,9 @@ public class MultiClientHandler implements Runnable {
 
                             System.out.println("[SERVER] File that you are looking for is found...");
 
-                            String temp = list.toString().substring(1,list.toString().length()-1);
-                            //System.out.println("[SERVER]"+temp+" LIST SENT");
+                            String temp = list.get(0);
+
+                            System.out.println("[SERVER]"+temp+" LIST SENT");
                             String sendIt = "FOUND: " + temp +"\n";
                             out.write(sendIt.getBytes(StandardCharsets.UTF_8));
 
