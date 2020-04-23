@@ -51,6 +51,8 @@ public class GUI extends JFrame implements ActionListener{
   private boolean showed = false;
   final int FTport = 9999;
   final String FTIP = "127.0.0.1";
+  private int upperBound = 9999;
+  private int lowerBound = 1000;
   private String IP;
   private int port;
   InputStream input;
@@ -111,8 +113,8 @@ public class GUI extends JFrame implements ActionListener{
     add(tf2);
 
     setVisible(true);
-    IP = findPublicIp();
-    port = 456;
+    IP = "127.0.0.1";
+    port = lowerBound + (int)(Math.random() * ((upperBound - lowerBound) + 1));
     if (getConnection()) {
       startAccepting();
     }
@@ -300,19 +302,26 @@ public class GUI extends JFrame implements ActionListener{
       InputStream pInput = anotherPeer.getInputStream();
       OutputStream pOutput = anotherPeer.getOutputStream();
       pOutput.write(("DOWNLOAD: " + fileInfo).getBytes(StandardCharsets.UTF_8));
-      String data = reader.readLine();
+      BufferedReader pReader = new BufferedReader(new InputStreamReader(pInput));
+      String data = pReader.readLine();
       if (data.startsWith("FILE: ")) {
         DataInputStream dis = new DataInputStream(input);
         FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
         int fsize = Integer.parseInt(info[2]);
         int read = 0;
         byte[] buf = new byte[4096];
-        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
-          fsize -= read;
-          fos.write(buf, 0, read);
-        }
+        // TODO: how to exit the while loop
+//        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
+//          fsize -= read;
+//          fos.write(buf, 0, read);
+//        }
+        read = dis.read(buf, 0, fsize);
+        fos.write(buf, 0, read);
+        pReader.close();
         fos.close();
         dis.close();
+        pOutput.close();
+        pInput.close();
         anotherPeer.close();
       }
     } catch (IOException e) {
@@ -320,6 +329,7 @@ public class GUI extends JFrame implements ActionListener{
     }
   }
 
+  //TODO: how to override exit method
   public void leave() {
     String bye = "BYE\n";
     try {
