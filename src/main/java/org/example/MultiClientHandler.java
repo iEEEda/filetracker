@@ -1,3 +1,4 @@
+//Aida Eduard, Yenur Sabyrzhanov
 package org.example;
 
 import java.io.BufferedReader;

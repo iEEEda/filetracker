@@ -1,11 +1,14 @@
+//Aida Eduard, Yernur Sabyrzhanov
 package org.example;
-
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,9 +16,9 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.DefaultListModel;
@@ -60,6 +63,7 @@ public class GUI extends JFrame implements ActionListener{
   Socket socket;
   BufferedReader reader;
   private AtomicBoolean disconect = new AtomicBoolean(false);
+  File directory = FileSystemView.getFileSystemView().getHomeDirectory();
   private String[] files = new String[5];
   int size = 0;
   int elements = 0;
@@ -118,6 +122,14 @@ public class GUI extends JFrame implements ActionListener{
     if (getConnection()) {
       startAccepting();
     }
+
+    addWindowListener(new java.awt.event.WindowAdapter() {
+      @Override
+      public void windowClosing(WindowEvent e) {
+        leave();
+        System.exit(0);
+      }
+    });
   }
   public void actionPerformed(ActionEvent e){
     if(e.getSource() == search){
@@ -142,7 +154,7 @@ public class GUI extends JFrame implements ActionListener{
     }
     else if(e.getSource() == upload) {
       if (size < 5) {
-        fc = new JFileChooser(FileSystemView.getFileSystemView().getHomeDirectory());
+        fc = new JFileChooser(directory);
         int r = fc.showOpenDialog(null);
         if (r == JFileChooser.APPROVE_OPTION) {
           File f = fc.getSelectedFile();
@@ -237,6 +249,7 @@ public class GUI extends JFrame implements ActionListener{
         System.out.println("Start listening");
         while (!disconect.get()) {
           System.out.println("waiting for clients...");
+          server.setSoTimeout(60000);
           Socket client = server.accept();
           System.out.println("Connected to client!");
           InputStream in = client.getInputStream();
@@ -247,21 +260,37 @@ public class GUI extends JFrame implements ActionListener{
             System.out.println("Client wants to download a file");
             out.write("FILE: \n".getBytes(StandardCharsets.UTF_8));
             String[] fileInfo = line.substring(10).split(", ");
-            byte[] filebytes;
-            File file = new File(fileInfo[0] + "." + fileInfo[1]);
+//            byte[] filebytes;
+            File file = new File(directory.getPath() + "\\" + fileInfo[0] + "." + fileInfo[1]);
+            DataOutputStream dos = new DataOutputStream(out);
+            FileInputStream fis = new FileInputStream(file);
+            byte[] buf = new byte[4096];
             if (file.exists()) {
               System.out.println("File exists");
-              filebytes = Files.readAllBytes(file.toPath());
-              out.write(filebytes, 0, filebytes.length);
-              out.flush();
+              int read;
+              System.out.println(file.toPath());
+//              filebytes = Files.readAllBytes(file.toPath());
+//              out.write(filebytes, 0, filebytes.length);
+//              out.flush();
+              while ((read = fis.read(buf)) > 0) {
+                System.out.println(read);
+                dos.write(buf, 0, read);
+              }
               System.out.println("Done.");
             }
+            fis.close();
+            dos.close();
           }
-          client.close();
           reader2.close();
           out.close();
           in.close();
+          client.close();
         }
+        server.close();
+      } catch (SocketTimeoutException e) {
+        //TODO: check if this works
+        leave();
+        e.printStackTrace();
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -270,7 +299,6 @@ public class GUI extends JFrame implements ActionListener{
 
   public String[] requestFiles(String name) {
     String search = "SEARCH: " + name + "\n";
-    //List<String> found = new ArrayList<>();
     String[] found = null;
     try {
       output.write(search.getBytes(StandardCharsets.UTF_8));
@@ -294,7 +322,6 @@ public class GUI extends JFrame implements ActionListener{
     String[] info = file.substring(10).split(", ");
     try {
       String fileInfo = info[0] + ", " + info[1] + ", " + info[2] + "\n";
-//    System.out.println(fileInfo);
       for (int i = 0; i < info.length; i++) {
         System.out.println();
       }
@@ -305,24 +332,28 @@ public class GUI extends JFrame implements ActionListener{
       BufferedReader pReader = new BufferedReader(new InputStreamReader(pInput));
       String data = pReader.readLine();
       if (data.startsWith("FILE: ")) {
-        DataInputStream dis = new DataInputStream(input);
+        DataInputStream dis = new DataInputStream(pInput);
         FileOutputStream fos = new FileOutputStream(info[0] + "." + info[1]);
         int fsize = Integer.parseInt(info[2]);
         int read = 0;
         byte[] buf = new byte[4096];
-        // TODO: how to exit the while loop
-//        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
-//          fsize -= read;
-//          fos.write(buf, 0, read);
-//        }
-        read = dis.read(buf, 0, fsize);
-        fos.write(buf, 0, read);
-        pReader.close();
+//        System.out.println("Before while");
+        while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
+          fsize -= read;
+          fos.write(buf, 0, read);
+//          System.out.println(read);
+        }
+//        System.out.println("After while");
+//        read = dis.read(buf, 0, fsize);
+//        System.out.println(read);
+//        fos.write(buf, 0, read);
         fos.close();
         dis.close();
+        pReader.close();
         pOutput.close();
         pInput.close();
         anotherPeer.close();
+        System.out.println("Finished downloading");
       }
     } catch (IOException e) {
       e.printStackTrace();
