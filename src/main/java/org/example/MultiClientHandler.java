@@ -35,7 +35,7 @@ public class MultiClientHandler implements Runnable {
             while (true) {
                 String request = in.readLine();
                 if (request != null) {
-                   // System.out.println(request);
+                   System.out.println(request);
                     if (!check) {
                         if (request.contains("HELLO")) {
                             //System.out.println("HELLO received");
@@ -57,7 +57,7 @@ public class MultiClientHandler implements Runnable {
 //                        <file name, file type, file size, file last modified date (DD/MM/YY), IP address, port number>
 //                        <yernur, txt, 45kb, 11/22/22, 123.123.123.1, 9999>
 //                        yernur txt 45kb 11/22/22 123.123.123.1 9999
-                            String[] arr = request.replaceAll("[^a-zA-Z0-9./ ]", "").split(" ");
+                            String[] arr = request.replaceAll("[^a-zA-Z0-9./, ]", "").split(",");
                             if (arr.length % 6 != 0) {
                                 System.out.println(
                                         "[SERVER][MultiClientHandler] submission was incorrect... TRY AGAIN!");
@@ -103,9 +103,10 @@ public class MultiClientHandler implements Runnable {
                         }
 
                     }
-                    if (request.contains("BYE")) {
-                        out.write("BYE BYE\n".getBytes(StandardCharsets.UTF_8));
-                        out.flush();
+                    if (request.startsWith("BYE")) {
+                        System.out.println("INSIDE BYE+++++++");
+//                        out.write("BYE BYE\n".getBytes(StandardCharsets.UTF_8));
+//                        out.flush();
                         int j = bye1.size();
                         for (int i = 0; i < j; i++) {
 

@@ -20,6 +20,11 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -42,6 +47,8 @@ import javax.swing.filechooser.FileSystemView;
  * @author Sain
  */
 public class GUI extends JFrame implements ActionListener{
+  private static ExecutorService threads = Executors.newFixedThreadPool(1);
+
   private JButton search;
   private JButton dload;
   private JButton upload;
@@ -248,43 +255,51 @@ public class GUI extends JFrame implements ActionListener{
         ServerSocket server = new ServerSocket(port);
         System.out.println("Start listening");
         while (!disconect.get()) {
+
           System.out.println("waiting for clients...");
-          server.setSoTimeout(60000);
+          //server.setSoTimeout(60000);
           Socket client = server.accept();
           System.out.println("Connected to client!");
-          InputStream in = client.getInputStream();
-          OutputStream out = client.getOutputStream();
-          BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
-          String line = reader2.readLine();
-          if (line.startsWith("DOWNLOAD: ")) {
-            System.out.println("Client wants to download a file");
-            out.write("FILE: \n".getBytes(StandardCharsets.UTF_8));
-            String[] fileInfo = line.substring(10).split(", ");
-//            byte[] filebytes;
-            File file = new File(directory.getPath() + "\\" + fileInfo[0] + "." + fileInfo[1]);
-            DataOutputStream dos = new DataOutputStream(out);
-            FileInputStream fis = new FileInputStream(file);
-            byte[] buf = new byte[4096];
-            if (file.exists()) {
-              System.out.println("File exists");
-              int read;
-              System.out.println(file.toPath());
-//              filebytes = Files.readAllBytes(file.toPath());
-//              out.write(filebytes, 0, filebytes.length);
-//              out.flush();
-              while ((read = fis.read(buf)) > 0) {
-                System.out.println(read);
-                dos.write(buf, 0, read);
-              }
-              System.out.println("Done.");
-            }
-            fis.close();
-            dos.close();
-          }
-          reader2.close();
-          out.close();
-          in.close();
-          client.close();
+          FileHandler peer = new FileHandler(client,directory);
+          threads.execute(peer);
+
+
+
+
+//
+//          InputStream in = client.getInputStream();
+//          OutputStream out = client.getOutputStream();
+//          BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
+//          String line = reader2.readLine();
+//          if (line.startsWith("DOWNLOAD: ")) {
+//            System.out.println("Client wants to download a file");
+//            out.write("FILE: \n".getBytes(StandardCharsets.UTF_8));
+//            String[] fileInfo = line.substring(10).split(", ");
+////            byte[] filebytes;
+//            File file = new File(directory.getPath() + "\\" + fileInfo[0] + "." + fileInfo[1]);
+//            DataOutputStream dos = new DataOutputStream(out);
+//            FileInputStream fis = new FileInputStream(file);
+//            byte[] buf = new byte[4096];
+//            if (file.exists()) {
+//              System.out.println("File exists");
+//              int read;
+//              System.out.println(file.toPath());
+////              filebytes = Files.readAllBytes(file.toPath());
+////              out.write(filebytes, 0, filebytes.length);
+////              out.flush();
+//              while ((read = fis.read(buf)) > 0) {
+//                System.out.println(read);
+//                dos.write(buf, 0, read);
+//              }
+//              System.out.println("Done.");
+//            }
+//            fis.close();
+//            dos.close();
+//          }
+//          reader2.close();
+//          out.close();
+//          in.close();
+//          client.close();
         }
         server.close();
       } catch (SocketTimeoutException e) {
