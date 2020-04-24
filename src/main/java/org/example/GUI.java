@@ -3,12 +3,11 @@ package org.example;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,9 +19,6 @@ import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,16 +32,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.filechooser.FileSystemView;
 
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
-/**
- *
- * @author Sain
- */
 public class GUI extends JFrame implements ActionListener{
   private static ExecutorService threads = Executors.newFixedThreadPool(1);
 
@@ -76,10 +62,9 @@ public class GUI extends JFrame implements ActionListener{
   int elements = 0;
 
   SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/YY");
-  //String str[] = {"Info1", "Info2", "Info3", "Info4", "Info5"};
 
   public GUI() {
-    super("Example GUI");
+    super("File Transfer Client v.62 (c) powered by Aida and Yernur");
     setLayout(null);
     setSize(500,600);
 
@@ -130,7 +115,7 @@ public class GUI extends JFrame implements ActionListener{
       startAccepting();
     }
 
-    addWindowListener(new java.awt.event.WindowAdapter() {
+    this.addWindowListener(new java.awt.event.WindowAdapter() {
       @Override
       public void windowClosing(WindowEvent e) {
         leave();
@@ -183,7 +168,6 @@ public class GUI extends JFrame implements ActionListener{
           sendFiles(size - 1);
           listModel.insertElementAt("Sent: " + name, elements);
           elements++;
-          System.out.println(files[size - 1]);
         }
       } else {
         tf2.setText("Maximum 5 files");
@@ -195,7 +179,6 @@ public class GUI extends JFrame implements ActionListener{
       } else {
         disconect.set(false);
         getConnection();
-        startAccepting();
         exit.setText("Disconnect");
         tf2.setText("Connected");
       }
@@ -226,8 +209,6 @@ public class GUI extends JFrame implements ActionListener{
       reader = new BufferedReader(new InputStreamReader(input));
       String data = reader.readLine();
       if (data.contains("HI")) {
-        System.out.println(data);
-        System.out.println("HI received");
         tf2.setText("Connected");
       }
       return true;
@@ -248,68 +229,24 @@ public class GUI extends JFrame implements ActionListener{
   }
 
   public void startAccepting() {
-//    System.out.println("Creating a thread");
-//    new Thread(() -> {
-//      System.out.println("Thread created");
       try {
         ServerSocket server = new ServerSocket(port);
-        System.out.println("Start listening");
+        System.out.println("[FT CLIENT] start listening");
         while (!disconect.get()) {
-
-          System.out.println("waiting for clients...");
+          System.out.println("[FT CLIENT] waiting for peers...");
           //server.setSoTimeout(60000);
           Socket client = server.accept();
-          System.out.println("Connected to client!");
-          FileHandler peer = new FileHandler(client,directory);
+          System.out.println("[FT CLIENT] connected to peer!");
+          FileHandler peer = new FileHandler(client, directory);
           threads.execute(peer);
-
-
-
-
-//
-//          InputStream in = client.getInputStream();
-//          OutputStream out = client.getOutputStream();
-//          BufferedReader reader2 = new BufferedReader(new InputStreamReader(in));
-//          String line = reader2.readLine();
-//          if (line.startsWith("DOWNLOAD: ")) {
-//            System.out.println("Client wants to download a file");
-//            out.write("FILE: \n".getBytes(StandardCharsets.UTF_8));
-//            String[] fileInfo = line.substring(10).split(", ");
-////            byte[] filebytes;
-//            File file = new File(directory.getPath() + "\\" + fileInfo[0] + "." + fileInfo[1]);
-//            DataOutputStream dos = new DataOutputStream(out);
-//            FileInputStream fis = new FileInputStream(file);
-//            byte[] buf = new byte[4096];
-//            if (file.exists()) {
-//              System.out.println("File exists");
-//              int read;
-//              System.out.println(file.toPath());
-////              filebytes = Files.readAllBytes(file.toPath());
-////              out.write(filebytes, 0, filebytes.length);
-////              out.flush();
-//              while ((read = fis.read(buf)) > 0) {
-//                System.out.println(read);
-//                dos.write(buf, 0, read);
-//              }
-//              System.out.println("Done.");
-//            }
-//            fis.close();
-//            dos.close();
-//          }
-//          reader2.close();
-//          out.close();
-//          in.close();
-//          client.close();
         }
         server.close();
       } catch (SocketTimeoutException e) {
-        //TODO: check if this works
         leave();
         e.printStackTrace();
       } catch (IOException e) {
         e.printStackTrace();
       }
-    //});
   }
 
   public String[] requestFiles(String name) {
@@ -337,9 +274,6 @@ public class GUI extends JFrame implements ActionListener{
     String[] info = file.substring(10).split(", ");
     try {
       String fileInfo = info[0] + ", " + info[1] + ", " + info[2] + "\n";
-      for (int i = 0; i < info.length; i++) {
-        System.out.println();
-      }
       Socket anotherPeer = new Socket(info[4], Integer.parseInt(info[5]));
       InputStream pInput = anotherPeer.getInputStream();
       OutputStream pOutput = anotherPeer.getOutputStream();
@@ -352,30 +286,22 @@ public class GUI extends JFrame implements ActionListener{
         int fsize = Integer.parseInt(info[2]);
         int read = 0;
         byte[] buf = new byte[4096];
-//        System.out.println("Before while");
         while ((read = dis.read(buf, 0, Math.min(buf.length, fsize))) > 0) {
           fsize -= read;
           fos.write(buf, 0, read);
-//          System.out.println(read);
         }
-//        System.out.println("After while");
-//        read = dis.read(buf, 0, fsize);
-//        System.out.println(read);
-//        fos.write(buf, 0, read);
         fos.close();
         dis.close();
         pReader.close();
         pOutput.close();
         pInput.close();
         anotherPeer.close();
-        System.out.println("Finished downloading");
       }
     } catch (IOException e) {
       e.printStackTrace();
     }
   }
 
-  //TODO: how to override exit method
   public void leave() {
     String bye = "BYE\n";
     try {
@@ -385,12 +311,25 @@ public class GUI extends JFrame implements ActionListener{
       output.close();
       socket.close();
       tf.setText("");
+      threads.shutdownNow();
       tf2.setText("Disconnected");
       listModel.removeAllElements();
       elements = 0;
       disconect.set(true);
+      //System.exit(0);
     } catch (IOException e) {
       e.printStackTrace();
     }
+  }
+
+  public static void main(String[] args) {
+    GUI ex = new GUI();
+    ex.addWindowListener(new WindowAdapter() {
+      @Override
+      public void windowClosing(WindowEvent e) {
+        ex.leave();
+        System.exit(0);
+      }
+    });
   }
 }
